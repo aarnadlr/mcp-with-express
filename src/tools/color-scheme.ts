@@ -50,6 +50,24 @@ type MaterialDynamicColors = {
 
 type DynamicScheme = any;
 
+type HctColor = {
+  toInt(): number;
+};
+
+type TonalPalette = {
+  keyColor: HctColor;
+  tone(tone: number): number;
+};
+
+type CorePaletteInstance = {
+  a1: TonalPalette;
+  a2: TonalPalette;
+  a3: TonalPalette;
+  n1: TonalPalette;
+  n2: TonalPalette;
+  error: TonalPalette;
+};
+
 type SchemeConstructor = new (
   sourceColorHct: any,
   isDark: boolean,
@@ -97,6 +115,9 @@ type LoadedModules = {
   hexFromArgb(argb: number): string;
   schemes: Record<ColorSchemeCategory, SchemeConstructor>;
   MaterialDynamicColors: MaterialDynamicColors;
+  CorePalette: {
+    of(argb: number): CorePaletteInstance;
+  };
 };
 
 let modulesPromise: Promise<LoadedModules> | null = null;
@@ -124,6 +145,7 @@ async function loadModules(): Promise<LoadedModules> {
         hexFromArgb: mcu.hexFromArgb,
         schemes,
         MaterialDynamicColors: mcu.MaterialDynamicColors,
+        CorePalette: mcu.CorePalette as unknown as LoadedModules["CorePalette"],
       };
     })();
   }
@@ -200,4 +222,37 @@ export async function generateColorScheme(
 ) {
   const { scheme, hexFromArgb, colors } = await buildScheme(options);
   return extractHexColors(scheme, hexFromArgb, colors);
+}
+
+export const CORE_PALETTE_ROLES = [
+  "primary",
+  "secondary",
+  "tertiary",
+  "error",
+  "neutral",
+  "neutralVariant",
+] as const;
+
+export type CorePaletteRole = (typeof CORE_PALETTE_ROLES)[number];
+
+export async function generateCorePaletteColors(seedColor: string): Promise<
+  Record<CorePaletteRole, string>
+> {
+  const modules = await loadModules();
+  const argb = modules.argbFromHex(seedColor);
+  const palette = modules.CorePalette.of(argb);
+
+  const keyColors: Record<CorePaletteRole, number> = {
+    primary: palette.a1.keyColor.toInt(),
+    secondary: palette.a2.keyColor.toInt(),
+    tertiary: palette.a3.keyColor.toInt(),
+    error: palette.error.keyColor.toInt(),
+    neutral: palette.n1.keyColor.toInt(),
+    neutralVariant: palette.n2.keyColor.toInt(),
+  };
+
+  return CORE_PALETTE_ROLES.reduce((acc, role) => {
+    acc[role] = modules.hexFromArgb(keyColors[role]);
+    return acc;
+  }, {} as Record<CorePaletteRole, string>);
 }
