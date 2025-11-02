@@ -29,35 +29,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       isConnected = true;
     }
 
-    const { method, id } = req.body;
-
-    // Handle MCP protocol methods
-    if (method === 'initialize') {
-      return res.json({
-        jsonrpc: '2.0',
-        id,
-        result: {
-          protocolVersion: '2024-11-05',
-          capabilities: {
-            tools: {},
-          },
-          serverInfo: {
-            name: 'weather',
-            version: '1.0.0',
-          },
-        },
-      });
-    }
-
-    if (method === 'tools/list') {
-      return res.json({
-        jsonrpc: '2.0',
-        id,
-        result: { tools: toolDefinitions },
-      });
-    }
-
-    // For tools/call and other methods, use the transport
+    // Let transport handle all MCP protocol methods
     await transport.handleRequest(req as any, res as any, req.body);
   } catch (error) {
     console.error('Error handling MCP request:', error);
