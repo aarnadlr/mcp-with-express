@@ -1,10 +1,17 @@
-import { createServer } from '../src/create-server.js';
+import { createServer, toolDefinitions } from '../src/create-server.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 
 export const config = {
-  runtime: 'edge',
+  runtime: 'nodejs',
 };
 
 const { server } = createServer();
+const transport = new StreamableHTTPServerTransport({
+  sessionIdGenerator: undefined,
+});
+
+// Initialize once
+let isConnected = false;
 
 export default async function handler(req: Request) {
   if (req.method !== 'POST') {
@@ -25,10 +32,16 @@ export default async function handler(req: Request) {
   }
 
   try {
+    // Connect server to transport if not already connected
+    if (!isConnected) {
+      await server.connect(transport);
+      isConnected = true;
+    }
+
     const body = await req.json();
     const { method, params, id } = body;
 
-    // Handle MCP protocol methods directly
+    // Handle MCP protocol methods
     if (method === 'initialize') {
       return new Response(
         JSON.stringify({
@@ -50,57 +63,48 @@ export default async function handler(req: Request) {
     }
 
     if (method === 'tools/list') {
-      // Get tools from server
-      const tools = Array.from(server.server.getHandlers('tools/call').keys()).map(name => ({
-        name,
-        description: `Tool: ${name}`,
-        inputSchema: {
-          type: 'object',
-          properties: {},
-        },
-      }));
-
       return new Response(
         JSON.stringify({
           jsonrpc: '2.0',
           id,
-          result: { tools },
+          result: { tools: toolDefinitions },
         }),
         { headers: { 'Content-Type': 'application/json' } }
       );
     }
 
     if (method === 'tools/call') {
-      // Call the tool handler directly
-      const toolName = params.name;
-      const toolArgs = params.arguments || {};
+      // Forward to transport which will handle it
+      const mockReq = {
+        body,
+        headers: { 'content-type': 'application/json' },
+      };
       
-      const handlers = server.server.getHandlers('tools/call');
-      const handler = handlers.get(toolName);
-      
-      if (!handler) {
-        return new Response(
-          JSON.stringify({
-            jsonrpc: '2.0',
-            id,
-            error: {
-              code: -32602,
-              message: `Tool not found: ${toolName}`,
-            },
-          }),
-          { headers: { 'Content-Type': 'application/json' } }
-        );
-      }
+      const mockRes: any = {
+        _data: null,
+        _status: 200,
+        status(code: number) {
+          this._status = code;
+          return this;
+        },
+        json(data: any) {
+          this._data = data;
+          return this;
+        },
+        setHeader() {},
+        end(data: any) {
+          if (data) this._data = JSON.parse(data);
+        },
+      };
 
-      const result = await handler(toolArgs);
+      await transport.handleRequest(mockReq as any, mockRes, body);
       
       return new Response(
-        JSON.stringify({
-          jsonrpc: '2.0',
-          id,
-          result,
-        }),
-        { headers: { 'Content-Type': 'application/json' } }
+        JSON.stringify(mockRes._data || { jsonrpc: '2.0', id, result: {} }),
+        { 
+          status: mockRes._status,
+          headers: { 'Content-Type': 'application/json' } 
+        }
       );
     }
 
