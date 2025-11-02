@@ -44,6 +44,7 @@ async function mcpRequest(method, params = {}) {
 
 async function main() {
   console.log('🎨 Testing CorePalette Colors Tool\n');
+  console.log(`📡 Server URL: ${SERVER_URL}\n`);
 
   // Generate CorePalette colors with seed color #FF0062
   console.log('Generating CorePalette colors with seed color #FF0062...');
