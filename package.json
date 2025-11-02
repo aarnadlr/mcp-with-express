@@ -31,6 +31,7 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.1",
     "@types/node": "^22.10.10",
+    "@vercel/node": "5.5.3",
     "concurrently": "^8.2.2",
     "nodemon": "^3.1.9",
     "shx": "^0.3.4",

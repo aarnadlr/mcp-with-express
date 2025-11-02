@@ -50,6 +50,24 @@ type MaterialDynamicColors = {
 
 type DynamicScheme = any;
 
+type HctColor = {
+  toInt(): number;
+};
+
+type TonalPalette = {
+  keyColor: HctColor;
+  tone(tone: number): number;
+};
+
+type CorePaletteInstance = {
+  a1: TonalPalette;
+  a2: TonalPalette;
+  a3: TonalPalette;
+  n1: TonalPalette;
+  n2: TonalPalette;
+  error: TonalPalette;
+};
+
 type SchemeConstructor = new (
   sourceColorHct: any,
   isDark: boolean,
@@ -97,6 +115,10 @@ type LoadedModules = {
   hexFromArgb(argb: number): string;
   schemes: Record<ColorSchemeCategory, SchemeConstructor>;
   MaterialDynamicColors: MaterialDynamicColors;
+  CorePalette: {
+    of(argb: number): CorePaletteInstance;
+    contentOf(argb: number): CorePaletteInstance;
+  };
 };
 
 let modulesPromise: Promise<LoadedModules> | null = null;
@@ -124,6 +146,7 @@ async function loadModules(): Promise<LoadedModules> {
         hexFromArgb: mcu.hexFromArgb,
         schemes,
         MaterialDynamicColors: mcu.MaterialDynamicColors,
+        CorePalette: mcu.CorePalette as unknown as LoadedModules["CorePalette"],
       };
     })();
   }
@@ -200,4 +223,41 @@ export async function generateColorScheme(
 ) {
   const { scheme, hexFromArgb, colors } = await buildScheme(options);
   return extractHexColors(scheme, hexFromArgb, colors);
+}
+
+export const CORE_PALETTE_ROLES = [
+  "primary",
+  "secondary",
+  "tertiary",
+  "error",
+  "neutral",
+  "neutralVariant",
+] as const;
+
+export type CorePaletteRole = (typeof CORE_PALETTE_ROLES)[number];
+
+export async function generateCorePaletteColors(seedColor: string): Promise<
+  Record<CorePaletteRole, string>
+> {
+  const modules = await loadModules();
+  const argb = modules.argbFromHex(seedColor);
+  // Use contentOf to match Material Theme Builder's behavior
+  const palette = modules.CorePalette.contentOf(argb);
+
+  // Material Theme Builder displays:
+  // - The original seed color for primary
+  // - Tone 60 from contentOf CorePalette for other colors
+  const colors: Record<CorePaletteRole, number> = {
+    primary: argb, // Use the original seed color
+    secondary: palette.a2.tone(60),
+    tertiary: palette.a3.tone(60),
+    error: palette.error.tone(60),
+    neutral: palette.n1.tone(60),
+    neutralVariant: palette.n2.tone(60),
+  };
+
+  return CORE_PALETTE_ROLES.reduce((acc, role) => {
+    acc[role] = modules.hexFromArgb(colors[role]).toUpperCase();
+    return acc;
+  }, {} as Record<CorePaletteRole, string>);
 }

@@ -2,11 +2,17 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import {
   generateColorScheme,
+  generateCorePaletteColors,
   supportedCategories,
 } from "./tools/color-scheme.js";
 
 const NWS_API_BASE = "https://api.weather.gov";
 const USER_AGENT = "weather-app/1.0";
+
+function ensureHashPrefix(hex: string): string {
+  const trimmed = hex.trim();
+  return trimmed.startsWith("#") ? trimmed : `#${trimmed}`;
+}
 
 // Helper function for making NWS API requests
 async function makeNWSRequest<T>(url: string): Promise<T | null> {
@@ -21,6 +27,7 @@ async function makeNWSRequest<T>(url: string): Promise<T | null> {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     return (await response.json()) as T;
+
   } catch (error) {
     console.error("Error making NWS request:", error);
     return null;
@@ -74,6 +81,82 @@ interface ForecastResponse {
     periods: ForecastPeriod[];
   };
 }
+
+// Tool definitions for export
+export const toolDefinitions = [
+  {
+    name: "get-alerts",
+    description: "Get weather alerts for a state",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        state: {
+          type: "string" as const,
+          description: "Two-letter state code (e.g. CA, NY)",
+          minLength: 2,
+          maxLength: 2,
+        },
+      },
+      required: ["state"],
+    },
+  },
+  {
+    name: "get-forecast",
+    description: "Get weather forecast for a location",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        latitude: {
+          type: "number" as const,
+          description: "Latitude of the location",
+          minimum: -90,
+          maximum: 90,
+        },
+        longitude: {
+          type: "number" as const,
+          description: "Longitude of the location",
+          minimum: -180,
+          maximum: 180,
+        },
+      },
+      required: ["latitude", "longitude"],
+    },
+  },
+  {
+    name: "generate_material_scheme_by_category",
+    description: "Generate a Material Design color scheme using Material Color Utilities",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        seedColor: {
+          type: "string" as const,
+          description: "Seed color hex code (e.g. #6200EE)",
+          pattern: "^#?(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$",
+        },
+        category: {
+          type: "string" as const,
+          description: "Material color scheme category",
+        },
+      },
+      required: ["seedColor", "category"],
+    },
+  },
+  {
+    name: "generate_corepalette_colors",
+    description: "Generate the six key colors from Material Color Utilities CorePalette",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        seedColor: {
+          type: "string" as const,
+          description: "Seed color hex code (e.g. #6200EE)",
+          pattern: "^#?(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$",
+        },
+      },
+      required: ["seedColor"],
+    },
+  },
+];
 
 export const createServer = () => {
   // Create server instance
@@ -236,29 +319,30 @@ export const createServer = () => {
     }
   );
 
+  const seedColorSchema = z
+    .string()
+    .trim()
+    .regex(/^#?(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/)
+    .describe("Seed color hex code (e.g. #6200EE)");
+
+  const supportedCategoryDescription = `Material color scheme category. Supported categories: ${supportedCategories()
+    .map((name) => `"${name}"`)
+    .join(", ")}`;
+
+
   server.tool(
-    "generate_color_scheme",
-    "Generate a Material Design color scheme using Material Color Utilities",
+    "generate_material_scheme_by_category",
+    "Generate a Material Design color scheme using Material Color Utilities, by receiving a seed color and a category",
     {
-      seedColor: z
-        .string()
-        .trim()
-        .regex(/^#?(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/)
-        .describe("Seed color hex code (e.g. #6200EE)"),
+      seedColor: seedColorSchema,
       category: z
         .string()
         .trim()
         .min(1)
-        .describe(
-          `Material color scheme category. Supported categories: ${supportedCategories()
-            .map((name) => `"${name}"`)
-            .join(", ")}`
-        ),
+        .describe(supportedCategoryDescription),
     },
     async ({ seedColor, category }) => {
-      const formattedSeed = seedColor.startsWith("#")
-        ? seedColor
-        : `#${seedColor}`;
+      const formattedSeed = ensureHashPrefix(seedColor);
 
       try {
         const colors = await generateColorScheme({
@@ -285,6 +369,43 @@ export const createServer = () => {
             {
               type: "text",
               text: `Failed to generate color scheme: ${message}`,
+            },
+          ],
+        };
+      }
+    }
+  );
+
+  server.tool(
+    "generate_corepalette_colors",
+    "Generate the six key colors from Material Color Utilities CorePalette",
+    {
+      seedColor: seedColorSchema,
+    },
+    async ({ seedColor }) => {
+      const formattedSeed = ensureHashPrefix(seedColor);
+
+      try {
+        const colors = await generateCorePaletteColors(formattedSeed);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(colors, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Unknown error generating core palette colors";
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Failed to generate core palette colors: ${message}`,
             },
           ],
         };

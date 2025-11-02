@@ -53,7 +53,8 @@ pnpm run prepare
   - `get-alerts`: Fetches weather alerts by 2-letter US state code
   - `get-forecast`: Fetches weather forecast by latitude/longitude coordinates
 - Registers Material Design color tooling:
-  - `generate_color_scheme`: Generates 10-role JSON palette from Material Color Utilities using a seed color and scheme variant
+  - `generate_material_scheme_by_category`: Generates 10-role JSON palette from Material Color Utilities using a seed color and scheme variant
+  - `generate_corepalette_colors`: Produces six key Material Theme Builder colors derived from MCU CorePalette key colors
 - All NWS API requests include `User-Agent: weather-app/1.0` header
 - Returns structured error messages when API calls fail
 
@@ -61,6 +62,7 @@ pnpm run prepare
 - Normalizes scheme categories and maps them to MCU `Scheme*` classes
 - Builds dynamic color schemes from seed hex colors (light mode, neutral contrast by default)
 - Extracts a curated set of 10 Material roles (primary/onPrimary/etc.) to hex codes
+- Exposes helpers to fetch CorePalette key colors (primary/secondary/tertiary/neutral/neutral-variant/error)
 
 ### Key Technical Details
 
@@ -86,10 +88,23 @@ When deployed to Vercel, use the full deployment URL with `/mcp` path.
 {
   "method": "tools.call",
   "params": {
-    "name": "generate_color_scheme",
+    "name": "generate_material_scheme_by_category",
     "arguments": {
       "seedColor": "#6200EE",
       "category": "vibrant"
+    }
+  }
+}
+```
+
+**Generate CorePalette key colors**
+```json
+{
+  "method": "tools.call",
+  "params": {
+    "name": "generate_corepalette_colors",
+    "arguments": {
+      "seedColor": "#6200EE"
     }
   }
 }
@@ -111,7 +126,7 @@ When deployed to Vercel, use the full deployment URL with `/mcp` path.
 ## Important Notes
 
 - MCU integration relies on vendored source—no additional npm install is required
-- `generate_color_scheme` currently outputs light-mode palettes with neutral contrast (dynamic scheme generation)
+- `generate_material_scheme_by_category` currently outputs light-mode palettes with neutral contrast (dynamic scheme generation)
 - NWS API only supports US locations; international coordinates will fail
 - The server is stateless (no session management)
 - Only POST requests are accepted at `/mcp` endpoint (GET/DELETE return 405)

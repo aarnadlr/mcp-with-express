@@ -6,6 +6,7 @@
 - `public/` — static assets served by Express (status pages, health checks).
 - `docs/` + `material-color-utilities/` — reference material; update only when syncing upstream libraries.
 - `src/tools/color-scheme.ts` — Material Color Utilities integration. Extend this module when adding palette roles or additional scheme metadata.
+- `generate_corepalette_colors` tooling should leverage Material Color Utilities `CorePalette` key colors (use the tonal palette `keyColor`) so results stay aligned with Material Theme Builder outputs.
 
 ## Build, Test, and Development Commands
 - `pnpm install` installs dependencies after cloning or pulling.
