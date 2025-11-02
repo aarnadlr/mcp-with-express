@@ -25,7 +25,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (body.method === 'initialize') {
       const result = await server.server.request(
         { method: 'initialize', params: body.params },
-        { requestId: body.id }
+        body.id
       );
       return res.json({
         jsonrpc: '2.0',
@@ -37,7 +37,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (body.method === 'tools/list') {
       const result = await server.server.request(
         { method: 'tools/list', params: body.params || {} },
-        { requestId: body.id }
+        body.id
       );
       return res.json({
         jsonrpc: '2.0',
@@ -49,7 +49,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (body.method === 'tools/call') {
       const result = await server.server.request(
         { method: 'tools/call', params: body.params },
-        { requestId: body.id }
+        body.id
       );
       return res.json({
         jsonrpc: '2.0',
@@ -61,7 +61,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Handle other methods
     const result = await server.server.request(
       { method: body.method, params: body.params },
-      { requestId: body.id }
+      body.id
     );
     
     return res.json({
