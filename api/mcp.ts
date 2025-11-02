@@ -11,6 +11,14 @@ const transport = new StreamableHTTPServerTransport({
 let isConnected = false;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method === 'GET') {
+    return res.status(200).json({
+      protocol: 'mcp',
+      version: '1.0',
+      capabilities: ['tools']
+    });
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({
       jsonrpc: '2.0',
