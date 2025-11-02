@@ -1,26 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { createServer } from '../src/create-server.js';
 
-// Singleton transport instance (stateless)
-let transport: StreamableHTTPServerTransport | null = null;
-let server: ReturnType<typeof createServer>['server'] | null = null;
-
-async function initializeServer() {
-  if (!transport) {
-    transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined, // stateless
-    });
-  }
-  
-  if (!server) {
-    const created = createServer();
-    server = created.server;
-    await server.connect(transport);
-  }
-  
-  return { transport, server };
-}
+// Create server instance once (reused across invocations in warm containers)
+const { server } = createServer();
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Only allow POST requests
@@ -36,15 +18,57 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // Initialize or reuse server and transport
-    const { transport, server } = await initializeServer();
-
-    // Handle the MCP request
-    await transport.handleRequest(
-      req as any,
-      res as any,
-      req.body
+    // Use Vercel's MCP adapter pattern - handle request directly
+    const body = req.body;
+    
+    // Call the appropriate method based on the JSON-RPC request
+    if (body.method === 'initialize') {
+      const result = await server.server.request(
+        { method: 'initialize', params: body.params },
+        { requestId: body.id }
+      );
+      return res.json({
+        jsonrpc: '2.0',
+        id: body.id,
+        result,
+      });
+    }
+    
+    if (body.method === 'tools/list') {
+      const result = await server.server.request(
+        { method: 'tools/list', params: body.params || {} },
+        { requestId: body.id }
+      );
+      return res.json({
+        jsonrpc: '2.0',
+        id: body.id,
+        result,
+      });
+    }
+    
+    if (body.method === 'tools/call') {
+      const result = await server.server.request(
+        { method: 'tools/call', params: body.params },
+        { requestId: body.id }
+      );
+      return res.json({
+        jsonrpc: '2.0',
+        id: body.id,
+        result,
+      });
+    }
+    
+    // Handle other methods
+    const result = await server.server.request(
+      { method: body.method, params: body.params },
+      { requestId: body.id }
     );
+    
+    return res.json({
+      jsonrpc: '2.0',
+      id: body.id,
+      result,
+    });
   } catch (error) {
     console.error('Error handling MCP request:', error);
     
@@ -53,9 +77,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         jsonrpc: '2.0',
         error: {
           code: -32603,
-          message: 'Internal server error',
+          message: error instanceof Error ? error.message : 'Internal server error',
         },
-        id: null,
+        id: req.body?.id || null,
       });
     }
   }
