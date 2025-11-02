@@ -1,8 +1,21 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { createServer } from '../src/create-server.js';
 
-// Create server instance once (reused across invocations in warm containers)
+// Create server and transport instances once
 const { server } = createServer();
+const transport = new StreamableHTTPServerTransport({
+  sessionIdGenerator: undefined,
+});
+
+// Initialize connection once
+let initialized = false;
+async function ensureInitialized() {
+  if (!initialized) {
+    await server.connect(transport);
+    initialized = true;
+  }
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Only allow POST requests
@@ -18,57 +31,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // Use Vercel's MCP adapter pattern - handle request directly
-    const body = req.body;
+    // Ensure server is initialized
+    await ensureInitialized();
     
-    // Call the appropriate method based on the JSON-RPC request
-    if (body.method === 'initialize') {
-      const result = await server.server.request(
-        { method: 'initialize', params: body.params },
-        body.id
-      );
-      return res.json({
-        jsonrpc: '2.0',
-        id: body.id,
-        result,
-      });
-    }
-    
-    if (body.method === 'tools/list') {
-      const result = await server.server.request(
-        { method: 'tools/list', params: body.params || {} },
-        body.id
-      );
-      return res.json({
-        jsonrpc: '2.0',
-        id: body.id,
-        result,
-      });
-    }
-    
-    if (body.method === 'tools/call') {
-      const result = await server.server.request(
-        { method: 'tools/call', params: body.params },
-        body.id
-      );
-      return res.json({
-        jsonrpc: '2.0',
-        id: body.id,
-        result,
-      });
-    }
-    
-    // Handle other methods
-    const result = await server.server.request(
-      { method: body.method, params: body.params },
-      body.id
-    );
-    
-    return res.json({
-      jsonrpc: '2.0',
-      id: body.id,
-      result,
-    });
+    // Use transport to handle the request
+    await transport.handleRequest(req as any, res as any, req.body);
   } catch (error) {
     console.error('Error handling MCP request:', error);
     
