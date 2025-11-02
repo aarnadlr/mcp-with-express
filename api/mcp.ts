@@ -17,9 +17,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const { server } = createServer();
     const transport = new SSEServerTransport('/message', res);
-    
+
     await server.connect(transport);
-    await transport.handlePostMessage(req.body);
+    await transport.handlePostMessage(req, res);
   } catch (error) {
     console.error('Error handling MCP request:', error);
     
