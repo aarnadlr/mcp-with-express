@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-const SERVER_URL = 'http://localhost:3000/mcp';
-// const SERVER_URL = 'https://mcu-mcp.vercel.app/mcp';
+// const SERVER_URL = 'http://localhost:3000/mcp';
+const SERVER_URL = 'https://mcu-mcp.vercel.app/mcp';
 
 async function mcpRequest(method, params = {}) {
   const response = await fetch(SERVER_URL, {

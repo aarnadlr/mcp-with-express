@@ -89,11 +89,6 @@ const setupServer = async () => {
   try {
     await server.connect(transport);
     console.log("Server connected successfully");
-    
-    // Auto-initialize the transport for Android Studio compatibility
-    // This bypasses the normal initialization handshake
-    (transport as any)._initialized = true;
-    console.log("Transport pre-initialized for Android Studio");
   } catch (error) {
     console.error("Failed to set up the server:", error);
     throw error;
