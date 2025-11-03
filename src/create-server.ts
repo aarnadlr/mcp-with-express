@@ -161,7 +161,7 @@ export const toolDefinitions = [
 export const createServer = () => {
   // Create server instance
   const server = new McpServer({
-    name: "mcu-mcp",
+    name: "MCU-MCP-SERVER",
     version: "1.0.0",
   });
 
