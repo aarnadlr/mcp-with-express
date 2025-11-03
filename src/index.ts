@@ -37,18 +37,27 @@ const handleMcpRequest = async (req: Request, res: Response) => {
   console.log("Received MCP request:", req.method, req.body);
 
   try {
-    // Android Studio compatibility: Return 200 OK for GET requests immediately
-    // Android Studio expects GET to succeed when "starting" the MCP server
+    // Android Studio compatibility: Return SSE stream for GET requests
+    // Android Studio expects text/event-stream content type
     if (req.method === "GET") {
-      console.log("Android Studio GET request - returning 200 OK");
-      res.status(200).json({
-        jsonrpc: "2.0",
-        result: {
-          status: "ready",
-          message: "MCP server is ready"
-        },
-        id: null
+      console.log("Android Studio GET request - establishing SSE stream");
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.status(200);
+      res.flushHeaders();
+      
+      // Keep connection alive - Android Studio expects this
+      // The connection stays open for server-initiated messages
+      const keepAlive = setInterval(() => {
+        res.write(': keepalive\n\n');
+      }, 30000);
+      
+      req.on('close', () => {
+        clearInterval(keepAlive);
+        console.log('Android Studio SSE connection closed');
       });
+      
       return;
     }
     
